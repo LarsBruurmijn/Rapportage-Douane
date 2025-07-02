@@ -4,7 +4,6 @@ import re
 import io
 from typing import Optional, Tuple, Dict
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
 
 def clean_text(text: str) -> str:
     """
@@ -58,13 +57,20 @@ def read_excel_file(uploaded_file) -> Tuple[Optional[pd.DataFrame], Optional[pd.
     Leest een Excel bestand in en retourneert de eerste twee tabbladen.
     """
     try:
-        # Lees beide tabbladen
-        sheet1 = pd.read_excel(uploaded_file, sheet_name=0)
+        # Reset file pointer
+        uploaded_file.seek(0)
+        
+        # Lees beide tabbladen met openpyxl engine
+        sheet1 = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
+        
+        # Reset file pointer voor tweede lezing
+        uploaded_file.seek(0)
         
         # Probeer het tweede tabblad te lezen
         try:
-            sheet2 = pd.read_excel(uploaded_file, sheet_name=1)
-        except:
+            sheet2 = pd.read_excel(uploaded_file, sheet_name=1, engine='openpyxl')
+        except Exception as e2:
+            st.warning(f"Geen tweede tabblad gevonden: {str(e2)}")
             sheet2 = None
             
         return sheet1, sheet2
@@ -163,33 +169,42 @@ def create_excel_output(df: pd.DataFrame) -> io.BytesIO:
     """
     output = io.BytesIO()
     
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='Taak met Norm', index=False)
         
-        # Format de Excel sheet
-        workbook = writer.book
-        worksheet = writer.sheets['Taak met Norm']
-        
-        # Header formatting
-        header_format = workbook.add_format({
-            'bold': True,
-            'text_wrap': True,
-            'valign': 'top',
-            'fg_color': '#D7E4BC',
-            'border': 1
-        })
-        
-        # Write headers
-        for col_num, value in enumerate(df.columns.values):
-            worksheet.write(0, col_num, value, header_format)
-        
-        # Auto-adjust column widths
-        for i, col in enumerate(df.columns):
-            max_length = max(
-                df[col].astype(str).apply(len).max(),
-                len(str(col))
-            )
-            worksheet.set_column(i, i, min(max_length + 2, 50))
+        # Probeer formatting toe te passen (optioneel)
+        try:
+            from openpyxl.styles import Font, PatternFill, Alignment
+            
+            workbook = writer.book
+            worksheet = workbook['Taak met Norm']
+            
+            # Header styling
+            header_fill = PatternFill(start_color='D7E4BC', end_color='D7E4BC', fill_type='solid')
+            header_font = Font(bold=True)
+            
+            # Style headers
+            for col in range(1, len(df.columns) + 1):
+                cell = worksheet.cell(row=1, column=col)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+            
+            # Auto-adjust column widths
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+                
+        except Exception as e:
+            st.warning(f"Formatting warning: {str(e)}")
     
     output.seek(0)
     return output
