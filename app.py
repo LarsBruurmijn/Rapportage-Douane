@@ -4,6 +4,7 @@ import re
 import io
 from typing import Optional, Tuple, Dict
 import openpyxl
+from excel_cleaner import clean_excel_file
 
 def clean_text(text: str) -> str:
     """
@@ -55,27 +56,118 @@ def clean_text(text: str) -> str:
 def read_excel_file(uploaded_file) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     """
     Leest een Excel bestand in en retourneert de eerste twee tabbladen.
+    Gebruikt meerdere strategieën om verschillende Excel formaten te ondersteunen.
     """
-    try:
-        # Reset file pointer
-        uploaded_file.seek(0)
-        
-        # Lees beide tabbladen met openpyxl engine
-        sheet1 = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
-        
-        # Reset file pointer voor tweede lezing
-        uploaded_file.seek(0)
-        
-        # Probeer het tweede tabblad te lezen
+    # Probeer verschillende engines en methoden
+    engines_to_try = ['openpyxl', 'xlrd', None]
+    
+    for engine in engines_to_try:
         try:
-            sheet2 = pd.read_excel(uploaded_file, sheet_name=1, engine='openpyxl')
-        except Exception as e2:
-            st.warning(f"Geen tweede tabblad gevonden: {str(e2)}")
-            sheet2 = None
+            # Reset file pointer
+            uploaded_file.seek(0)
             
-        return sheet1, sheet2
+            # Lees het eerste tabblad
+            if engine:
+                sheet1 = pd.read_excel(uploaded_file, sheet_name=0, engine=engine)
+            else:
+                sheet1 = pd.read_excel(uploaded_file, sheet_name=0)
+            
+            # Reset file pointer voor tweede lezing
+            uploaded_file.seek(0)
+            
+            # Probeer het tweede tabblad te lezen
+            sheet2 = None
+            try:
+                if engine:
+                    sheet2 = pd.read_excel(uploaded_file, sheet_name=1, engine=engine)
+                else:
+                    sheet2 = pd.read_excel(uploaded_file, sheet_name=1)
+            except:
+                # Geen tweede tabblad of fout bij lezen
+                pass
+            
+            # Als we hier zijn, was het succesvol
+            if engine:
+                st.success(f"✅ Bestand gelezen met {engine} engine")
+                st.info(f"📊 Sheet 1: {len(sheet1)} rijen, {len(sheet1.columns)} kolommen")
+                if sheet2 is not None:
+                    st.info(f"📊 Sheet 2: {len(sheet2)} rijen, {len(sheet2.columns)} kolommen")
+            else:
+                st.success(f"✅ Bestand gelezen met standaard engine")
+            
+            return sheet1, sheet2
+            
+        except Exception as e:
+            if engine:
+                st.warning(f"Engine {engine} mislukt: {str(e)}")
+            else:
+                st.warning(f"Standaard engine mislukt: {str(e)}")
+            continue
+    
+    # Als alle engines falen, probeer Excel cleaning
+    st.info("🔧 Alle standaard methodes gefaald. Probeer Excel bestand te zuiveren...")
+    
+    try:
+        uploaded_file.seek(0)
+        cleaned_file, sheet_names = clean_excel_file(uploaded_file)
+        
+        if cleaned_file and sheet_names:
+            st.info(f"📋 Gevonden sheets: {sheet_names}")
+            
+            # Probeer het gezuiverde bestand te lezen
+            sheet1 = pd.read_excel(cleaned_file, sheet_name=0, engine='openpyxl')
+            
+            # Probeer tweede sheet
+            sheet2 = None
+            if len(sheet_names) > 1:
+                cleaned_file.seek(0)
+                try:
+                    sheet2 = pd.read_excel(cleaned_file, sheet_name=1, engine='openpyxl')
+                except:
+                    pass
+            
+            st.success("✅ Bestand succesvol gezuiverd en gelezen!")
+            return sheet1, sheet2
+        
     except Exception as e:
-        st.error(f"Fout bij het lezen van het Excel bestand: {str(e)}")
+        st.error(f"Excel zuivering mislukt: {str(e)}")
+    
+    # Laatste poging: via BytesIO met tijdelijk bestand
+    try:
+        uploaded_file.seek(0)
+        file_bytes = uploaded_file.read()
+        
+        # Schrijf naar tijdelijk bestand
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+            tmp_file.write(file_bytes)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Probeer via tijdelijk bestand
+            sheet1 = pd.read_excel(tmp_file_path, sheet_name=0)
+            try:
+                sheet2 = pd.read_excel(tmp_file_path, sheet_name=1)
+            except:
+                sheet2 = None
+            
+            st.success("✅ Bestand gelezen via tijdelijk bestand")
+            return sheet1, sheet2
+            
+        finally:
+            # Verwijder tijdelijk bestand
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+                
+    except Exception as e:
+        st.error(f"❌ Alle lees-strategieën gefaald. Laatste fout: {str(e)}")
+        st.error("💡 Probeer het bestand opnieuw op te slaan als .xlsx in Excel of LibreOffice")
+        st.info("🔍 Controleer of het bestand:")
+        st.info("   • Daadwerkelijk een Excel bestand is (.xlsx)")
+        st.info("   • Niet wachtwoord beveiligd is")
+        st.info("   • Geen corrupt formatting bevat")
         return None, None
 
 def create_mapping_dict(mapping_df: pd.DataFrame) -> Dict[str, str]:
@@ -238,6 +330,13 @@ def main():
         - Tekst opschoning (spaties en regeleinden)
         - Excel export met gecombineerde data
         """)
+        
+        st.header("🔧 Problemen?")
+        st.info("Bij Excel lees-fouten:\n• Sla bestand opnieuw op als .xlsx\n• Verwijder formatting\n• App heeft ingebouwde Excel cleaner")
+        
+        if st.button("📖 Volledige Troubleshooting"):
+            st.balloons()
+            st.success("Bekijk TROUBLESHOOTING.md in de project directory voor uitgebreide hulp!")
     
     # File uploaders
     col1, col2 = st.columns(2)
