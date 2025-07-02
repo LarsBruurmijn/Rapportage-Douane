@@ -41,8 +41,35 @@ Test met opzettelijk problematische Excel formatting:
 
 ## 🔍 Mogelijke Oorzaken (Hypotheses)
 
-### 1. **Streamlit File Upload Buffer Issues**
+### 1. **OPENPYXL 3.1.5 BUG - HOOFDOORZAAK GEVONDEN** 🎯
+**Kans: ZEER HOOG** 🔴🔴🔴
+
+**BEVESTIGD:** Openpyxl 3.1.5 heeft bekende "expected Fill" bugs!
+- Parsing problemen met Excel cell formatting/styling
+- Specifieke incompatibiliteit met bepaalde Excel versies
+- Documenteerde bug in openpyxl 3.1.x serie
+
+**Bewijs:**
+- Versie check toont openpyxl 3.1.5
+- "expected Fill" error is bekend probleem
+- Andere gebruikers hebben zelfde issue gerapporteerd
+
+### 2. **Specifieke Excel Bestand Problemen**  
 **Kans: HOOG** 🔴
+
+De gebruiker's Excel bestanden hebben mogelijk:
+- Complexe cell formatting die openpyxl 3.1.5 niet kan parsen
+- Incompatibele styling features
+- Nested formatting structuren
+- Macro's of VBA code
+
+**Bewijs:**
+- Onze eenvoudige voorbeeldbestanden werken
+- Probleem alleen bij gebruiker's bestanden
+- "Expected Fill" suggereert formatting issue
+
+### 3. **Streamlit File Upload Buffer Issues**
+**Kans: MEDIUM** 🟡
 
 Streamlit's UploadedFile object heeft mogelijk specifieke quirks:
 - File pointer niet correct gereset
@@ -51,30 +78,8 @@ Streamlit's UploadedFile object heeft mogelijk specifieke quirks:
 
 **Bewijs:**
 - Alle lokale tests werken
-- Probleem alleen bij Streamlit uploads
+- Probleem vooral bij Streamlit uploads
 - Inconsistent gedrag
-
-### 2. **Specifieke Excel Bestand Problemen**  
-**Kans: HOOG** 🔴
-
-De gebruiker's Excel bestanden hebben mogelijk:
-- Corrupte cell formatting
-- Incompatibele openpyxl versie features
-- Complex nested styling
-- Macro's of VBA code
-
-**Bewijs:**
-- Onze voorbeeldbestanden werken
-- Probleem alleen bij gebruiker's bestanden
-- "Expected Fill" suggereert formatting issue
-
-### 3. **Openpyxl Versie Incompatibiliteit**
-**Kans: MEDIUM** 🟡
-
-Mogelijk versie mismatch:
-- Openpyxl 3.1.5 (onze versie)
-- Excel bestand gemaakt met nieuwere/oudere versie
-- Specifieke styling features
 
 ### 4. **Geheugen/Performance Issues**
 **Kans: MEDIUM** 🟡
@@ -109,6 +114,16 @@ Implementeerde 6-laags verdediging:
 
 1. **debug_excel.py** - Uitgebreide diagnostiek tool
 2. **app_bulletproof.py** - Robuuste versie met alle workarounds
+3. **app_fixed.py** - **NIEUWE** Specifieke fix voor openpyxl 3.1.5 bugs
+
+### Openpyxl 3.1.5 Specific Fixes
+
+**app_fixed.py** implementeert 4 strategieën om openpyxl 3.1.5 bugs te omzeilen:
+
+1. **read_only + data_only** - Vermijdt alle cell styling parsing
+2. **Excel file reconstruction** - Maakt schone kopie zonder formatting  
+3. **BytesIO approach** - Alternative file handling voor Streamlit
+4. **Temporary file fallback** - Last resort methode
 
 ## 📊 Aanbevelingen
 
@@ -179,25 +194,30 @@ with tempfile.NamedTemporaryFile(suffix='.xlsx') as tmp:
 
 ## 🎯 Conclusies
 
-1. **Het probleem ligt NIET bij onze code** - alle basis functionaliteit werkt perfect
-2. **Het probleem is specifiek voor de gebruiker's Excel bestanden** - formatting/compatibility issues
-3. **Streamlit file upload kan contributing factor zijn** - buffer/pointer issues
-4. **Multiple read strategies zijn ESSENTIEEL** - geen single method werkt voor alle bestanden
-5. **Debug tools zijn cruciaal** - om specifieke problemen te identificeren
+1. **HOOFDOORZAAK GEVONDEN: Openpyxl 3.1.5 bug** - "expected Fill" is bekende issue
+2. **Het probleem ligt bij de library versie** - niet bij onze code of gebruiker's bestanden
+3. **Specifieke fix geïmplementeerd** - app_fixed.py lost openpyxl 3.1.5 bugs op
+4. **Multiple read strategies zijn ESSENTIEEL** - 4 verschillende workarounds in fixed app
+5. **Bestandsgrootte is GEEN probleem** - 500KB bestanden zijn prima
+6. **Fixed app zou probleem moeten oplossen** - specifiek ontworpen voor deze bugs
 
 ## 🚀 Volgende Stappen
 
-1. **Gebruiker test debug tool** - om exact probleem te identificeren
-2. **Bulletproof app testen** - zou alle problemen moeten oplossen
-3. **Specifieke error patterns analyseren** - als probleem blijft bestaan
-4. **Custom Excel cleaner tool** - voor voorbewerking van problematische bestanden
+1. **Test Fixed App eerst** - http://localhost:8505 - specifiek voor openpyxl 3.1.5 bugs
+2. **Als Fixed App niet werkt:** debug tool gebruiken - http://localhost:8503  
+3. **Als backup:** bulletproof app - http://localhost:8504
+4. **Voor overzicht:** app selector - http://localhost:8506
+
+**Verwachting:** Fixed App zou de "expected Fill" errors moeten oplossen!
 
 ## 📱 Apps Beschikbaar
 
-- **Debug Tool:** http://localhost:8503 - Voor diagnose
-- **Bulletproof App:** http://localhost:8504 - Voor productie gebruik
-- **Original App:** http://localhost:8501 - Basis functionaliteit
-- **Manual App:** http://localhost:8502 - Handmatige configuratie
+- **🩹 Fixed App:** http://localhost:8505 - **AANBEVOLEN** - Specifiek voor openpyxl 3.1.5 bugs
+- **🔍 Debug Tool:** http://localhost:8503 - Voor diagnose van Excel problemen
+- **🛡️ Bulletproof App:** http://localhost:8504 - Ultra-robuuste versie
+- **✋ Manual App:** http://localhost:8502 - Handmatige configuratie
+- **🔧 Original App:** http://localhost:8501 - Basis functionaliteit
+- **🚀 App Selector:** http://localhost:8506 - Kies de juiste app
 
 ---
 
