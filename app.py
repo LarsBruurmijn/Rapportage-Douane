@@ -53,122 +53,77 @@ def clean_text(text: str) -> str:
     
     return text
 
-def read_excel_file(uploaded_file) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
+def get_excel_sheet_names(uploaded_file) -> list:
     """
-    Leest een Excel bestand in en retourneert de eerste twee tabbladen.
-    Gebruikt meerdere strategieën om verschillende Excel formaten te ondersteunen.
+    Haalt alle sheet namen op uit een Excel bestand.
     """
-    # Probeer verschillende engines en methoden
+    try:
+        uploaded_file.seek(0)
+        # Probeer met openpyxl
+        try:
+            wb = openpyxl.load_workbook(uploaded_file, read_only=True)
+            sheet_names = wb.sheetnames
+            wb.close()
+            return sheet_names
+        except:
+            # Probeer met pandas
+            uploaded_file.seek(0)
+            excel_file = pd.ExcelFile(uploaded_file)
+            return excel_file.sheet_names
+    except Exception as e:
+        st.error(f"Kan sheet namen niet ophalen: {str(e)}")
+        return []
+
+def read_excel_sheet(uploaded_file, sheet_name=None, sheet_index=None) -> Optional[pd.DataFrame]:
+    """
+    Leest een specifiek Excel tabblad in.
+    """
     engines_to_try = ['openpyxl', 'xlrd', None]
     
     for engine in engines_to_try:
         try:
-            # Reset file pointer
             uploaded_file.seek(0)
             
-            # Lees het eerste tabblad
-            if engine:
-                sheet1 = pd.read_excel(uploaded_file, sheet_name=0, engine=engine)
+            # Bepaal welk sheet te lezen
+            if sheet_name:
+                sheet_selector = sheet_name
+            elif sheet_index is not None:
+                sheet_selector = sheet_index
             else:
-                sheet1 = pd.read_excel(uploaded_file, sheet_name=0)
+                sheet_selector = 0
             
-            # Reset file pointer voor tweede lezing
-            uploaded_file.seek(0)
-            
-            # Probeer het tweede tabblad te lezen
-            sheet2 = None
-            try:
-                if engine:
-                    sheet2 = pd.read_excel(uploaded_file, sheet_name=1, engine=engine)
-                else:
-                    sheet2 = pd.read_excel(uploaded_file, sheet_name=1)
-            except:
-                # Geen tweede tabblad of fout bij lezen
-                pass
-            
-            # Als we hier zijn, was het succesvol
+            # Lees het sheet
             if engine:
-                st.success(f"✅ Bestand gelezen met {engine} engine")
-                st.info(f"📊 Sheet 1: {len(sheet1)} rijen, {len(sheet1.columns)} kolommen")
-                if sheet2 is not None:
-                    st.info(f"📊 Sheet 2: {len(sheet2)} rijen, {len(sheet2.columns)} kolommen")
+                df = pd.read_excel(uploaded_file, sheet_name=sheet_selector, engine=engine)
             else:
-                st.success(f"✅ Bestand gelezen met standaard engine")
+                df = pd.read_excel(uploaded_file, sheet_name=sheet_selector)
             
-            return sheet1, sheet2
+            return df
             
         except Exception as e:
-            if engine:
-                st.warning(f"Engine {engine} mislukt: {str(e)}")
-            else:
-                st.warning(f"Standaard engine mislukt: {str(e)}")
             continue
     
-    # Als alle engines falen, probeer Excel cleaning
-    st.info("🔧 Alle standaard methodes gefaald. Probeer Excel bestand te zuiveren...")
-    
+    # Als alles faalt, probeer Excel cleaning
     try:
         uploaded_file.seek(0)
         cleaned_file, sheet_names = clean_excel_file(uploaded_file)
         
         if cleaned_file and sheet_names:
-            st.info(f"📋 Gevonden sheets: {sheet_names}")
-            
-            # Probeer het gezuiverde bestand te lezen
-            sheet1 = pd.read_excel(cleaned_file, sheet_name=0, engine='openpyxl')
-            
-            # Probeer tweede sheet
-            sheet2 = None
-            if len(sheet_names) > 1:
-                cleaned_file.seek(0)
-                try:
-                    sheet2 = pd.read_excel(cleaned_file, sheet_name=1, engine='openpyxl')
-                except:
-                    pass
-            
-            st.success("✅ Bestand succesvol gezuiverd en gelezen!")
-            return sheet1, sheet2
-        
-    except Exception as e:
-        st.error(f"Excel zuivering mislukt: {str(e)}")
-    
-    # Laatste poging: via BytesIO met tijdelijk bestand
-    try:
-        uploaded_file.seek(0)
-        file_bytes = uploaded_file.read()
-        
-        # Schrijf naar tijdelijk bestand
-        import tempfile
-        import os
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            tmp_file.write(file_bytes)
-            tmp_file_path = tmp_file.name
-        
-        try:
-            # Probeer via tijdelijk bestand
-            sheet1 = pd.read_excel(tmp_file_path, sheet_name=0)
-            try:
-                sheet2 = pd.read_excel(tmp_file_path, sheet_name=1)
-            except:
-                sheet2 = None
-            
-            st.success("✅ Bestand gelezen via tijdelijk bestand")
-            return sheet1, sheet2
-            
-        finally:
-            # Verwijder tijdelijk bestand
-            if os.path.exists(tmp_file_path):
-                os.unlink(tmp_file_path)
+            # Bepaal welk sheet te lezen uit de cleaned file
+            if sheet_name and sheet_name in sheet_names:
+                sheet_selector = sheet_name
+            elif sheet_index is not None and sheet_index < len(sheet_names):
+                sheet_selector = sheet_index
+            else:
+                sheet_selector = 0
                 
+            df = pd.read_excel(cleaned_file, sheet_name=sheet_selector, engine='openpyxl')
+            return df
+        
     except Exception as e:
-        st.error(f"❌ Alle lees-strategieën gefaald. Laatste fout: {str(e)}")
-        st.error("💡 Probeer het bestand opnieuw op te slaan als .xlsx in Excel of LibreOffice")
-        st.info("🔍 Controleer of het bestand:")
-        st.info("   • Daadwerkelijk een Excel bestand is (.xlsx)")
-        st.info("   • Niet wachtwoord beveiligd is")
-        st.info("   • Geen corrupt formatting bevat")
-        return None, None
+        st.error(f"Excel lezen mislukt: {str(e)}")
+    
+    return None
 
 def create_mapping_dict(mapping_df: pd.DataFrame) -> Dict[str, str]:
     """
@@ -358,12 +313,60 @@ def main():
         )
     
     if tasks_file and norms_file:
-        # Lees bestanden in
-        with st.spinner("Bestanden worden ingelezen..."):
-            tasks_df, _ = read_excel_file(tasks_file)
-            norms_df, mapping_df = read_excel_file(norms_file)
+        # Eerst sheet namen ophalen
+        with st.spinner("Excel sheets detecteren..."):
+            tasks_sheets = get_excel_sheet_names(tasks_file)
+            norms_sheets = get_excel_sheet_names(norms_file)
         
-        if tasks_df is not None and norms_df is not None and mapping_df is not None:
+        if tasks_sheets and norms_sheets:
+            st.success(f"✅ Taakbestand heeft {len(tasks_sheets)} sheet(s): {tasks_sheets}")
+            st.success(f"✅ Normbestand heeft {len(norms_sheets)} sheet(s): {norms_sheets}")
+            
+            # Laat gebruiker sheets selecteren
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📋 Selecteer Taak Sheet")
+                selected_task_sheet = st.selectbox(
+                    "Kies het tabblad met taken:",
+                    options=tasks_sheets,
+                    key="task_sheet_selector"
+                )
+                
+            with col2:
+                st.subheader("📏 Selecteer Norm Sheets")
+                selected_norm_data_sheet = st.selectbox(
+                    "Kies het tabblad met normgegevens:",
+                    options=norms_sheets,
+                    key="norm_data_sheet_selector"
+                )
+                
+                selected_norm_mapping_sheet = st.selectbox(
+                    "Kies het tabblad met mapping (Norm-ID ↔ Taaknaam):",
+                    options=norms_sheets,
+                    key="norm_mapping_sheet_selector"
+                )
+            
+            # Lees geselecteerde sheets in
+            if st.button("📖 Lees Geselecteerde Sheets", type="secondary"):
+                with st.spinner("Geselecteerde sheets worden ingelezen..."):
+                    tasks_df = read_excel_sheet(tasks_file, sheet_name=selected_task_sheet)
+                    norms_df = read_excel_sheet(norms_file, sheet_name=selected_norm_data_sheet)
+                    mapping_df = read_excel_sheet(norms_file, sheet_name=selected_norm_mapping_sheet)
+                
+                if tasks_df is not None and norms_df is not None and mapping_df is not None:
+                    st.session_state['tasks_df'] = tasks_df
+                    st.session_state['norms_df'] = norms_df
+                    st.session_state['mapping_df'] = mapping_df
+                    st.success("✅ Alle sheets succesvol ingelezen!")
+                else:
+                    st.error("❌ Fout bij het inlezen van een of meer sheets")
+        
+        # Check of data in session state staat
+        if 'tasks_df' in st.session_state and 'norms_df' in st.session_state and 'mapping_df' in st.session_state:
+            tasks_df = st.session_state['tasks_df']
+            norms_df = st.session_state['norms_df'] 
+            mapping_df = st.session_state['mapping_df']
             st.success("✅ Beide bestanden succesvol ingelezen!")
             
             # Toon preview van data
@@ -429,13 +432,17 @@ def main():
                         st.success("✅ Verwerking voltooid! Alle tekstvelden zijn opgeschoond en taken zijn gekoppeld aan normen.")
                     
                     else:
-                        st.error("❌ Geen geldige mapping gevonden in het tweede tabblad van het normbestand.")
+                        st.error("❌ Geen geldige mapping gevonden in het mapping tabblad.")
         
         else:
-            st.error("❌ Fout bij het inlezen van één of beide bestanden. Controleer of de bestanden geldig zijn en het normbestand twee tabbladen heeft.")
+            st.error("❌ Kan sheet namen niet detecteren. Controleer of de bestanden geldig zijn.")
     
     else:
         st.info("👆 Upload beide Excel-bestanden om te beginnen.")
+        # Clear session state als bestanden gewijzigd zijn
+        for key in ['tasks_df', 'norms_df', 'mapping_df']:
+            if key in st.session_state:
+                del st.session_state[key]
 
 if __name__ == "__main__":
     main()

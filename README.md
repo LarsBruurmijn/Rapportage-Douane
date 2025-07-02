@@ -20,13 +20,15 @@ Een interactieve Streamlit webapplicatie voor het verwerken en verrijken van Exc
 
 ### Taakbestand
 - Excel bestand (.xlsx of .xls)
+- **🆕 Ondersteunt meerdere tabbladen** - kies welke je wilt gebruiken
 - Bevat een lijst met taken
 - Gebruiker kan de kolom met taaknamen selecteren
 
 ### Normbestand
-- Excel bestand (.xlsx of .xls) met **2 tabbladen**:
-  - **Tabblad 1**: Normgegevens (alle norm informatie)
-  - **Tabblad 2**: Mapping (kolom 1: Norm-ID, kolom 2: Taaknaam)
+- Excel bestand (.xlsx of .xls) met **minimaal 2 tabbladen**:
+  - **Normgegevens tabblad**: Alle norm informatie
+  - **Mapping tabblad**: Mapping tussen Norm-ID en Taaknaam (kolom 1: Norm-ID, kolom 2: Taaknaam)
+- **🆕 Ondersteunt 3+ tabbladen** - selecteer precies welke je nodig hebt
 
 ## 🛠️ Installatie
 
@@ -48,18 +50,25 @@ streamlit run app.py
    - Upload het taakbestand in het linker paneel
    - Upload het normbestand in het rechter paneel
 
-2. **Selecteer Taaknaam Kolom**:
+2. **🆕 Selecteer Tabbladen**:
+   - App detecteert automatisch alle beschikbare sheets
+   - Kies het taak-tabblad uit de dropdown
+   - Kies het normgegevens-tabblad uit de dropdown
+   - Kies het mapping-tabblad uit de dropdown
+   - Klik "Lees Geselecteerde Sheets"
+
+3. **Selecteer Taaknaam Kolom**:
    - Kies uit de dropdown welke kolom de taaknamen bevat
 
-3. **Preview Data**:
-   - Bekijk een preview van beide bestanden
+4. **Preview Data**:
+   - Bekijk een preview van alle geselecteerde tabbladen
    - Controleer de mapping data
 
-4. **Genereer Resultaat**:
+5. **Genereer Resultaat**:
    - Klik op "Genereer Uitvoerbestand"
    - Bekijk statistieken over de koppeling
 
-5. **Download**:
+6. **Download**:
    - Download het verwerkte Excel-bestand
    - Het bestand bevat een tabblad "Taak met Norm"
 
@@ -95,8 +104,12 @@ De applicatie gebruikt zowel exacte als fuzzy matching:
 
 ## ✨ Extra Features
 
+- **🆕 Multi-sheet ondersteuning**: Werk met Excel bestanden met meerdere tabbladen
+- **🆕 Sheet selectie**: Kies precies welke tabbladen je wilt gebruiken
+- **🆕 Robuuste Excel handling**: Automatische error recovery en file cleaning
 - Real-time preview van geüploade data
 - Interactieve statistieken over koppelingen
 - Professionele Excel formatting
-- Uitgebreide error handling
+- Uitgebreide error handling met multiple engines
 - Gebruiksvriendelijke interface met instructies
+- Session state management voor betere UX
